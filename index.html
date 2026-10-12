@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Тетрис">
+<meta name="theme-color" content="#0b0d17">
+<title>Тетрис</title>
+<style>
+  :root {
+    --bg: #0b0d17;
+    --panel: #161a2b;
+    --text: #e8ebf7;
+    --muted: #8189a8;
+    --accent: #5b8cff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Helvetica, Arial, sans-serif;
+    overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+  #app {
+    height: 100%; height: 100dvh;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 12px)
+             calc(env(safe-area-inset-bottom) + 10px) calc(env(safe-area-inset-left) + 12px);
+    max-width: 520px; margin: 0 auto;
+  }
+  #top { display: flex; gap: 8px; align-items: stretch; }
+  .stat {
+    flex: 1; background: var(--panel); border-radius: 12px; padding: 6px 10px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .stat small { color: var(--muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+  .stat b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  #nextBox { background: var(--panel); border-radius: 12px; padding: 4px; display: flex; align-items: center; justify-content: center; }
+  #next { width: 56px; height: 56px; display: block; }
+  #boardWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+  #board { background: #0f1222; border-radius: 10px; border: 2px solid #232844; touch-action: none; }
+  #overlay {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; background: rgba(11,13,23,.78); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    text-align: center; border-radius: 10px; padding: 20px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 { margin: 0; font-size: 30px; }
+  #overlay p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }
+  #overlay button, #pauseBtn {
+    appearance: none; border: 0; border-radius: 14px; background: var(--accent); color: #fff;
+    font-size: 18px; font-weight: 600; padding: 12px 28px;
+  }
+  #overlay button:active { filter: brightness(.85); }
+  #controls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .btn {
+    appearance: none; border: 0; border-radius: 16px; background: var(--panel); color: var(--text);
+    height: 64px; font-size: 26px; touch-action: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn:active, .btn.down { background: #262c4a; transform: scale(.96); }
+  .btn.rot { background: var(--accent); }
+  .btn.rot:active { background: #4a77e0; }
+  #pauseBtn {
+    position: absolute; top: 6px; right: 6px; padding: 0; width: 38px; height: 38px;
+    font-size: 16px; background: rgba(22,26,43,.85); border-radius: 10px; touch-action: manipulation;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div class="stat"><small>Очки</small><b id="score">0</b></div>
+    <div class="stat"><small>Линии</small><b id="lines">0</b></div>
+    <div class="stat"><small>Уровень</small><b id="level">1</b></div>
+    <div id="nextBox"><canvas id="next" width="112" height="112"></canvas></div>
+  </div>
+
+  <div id="boardWrap">
+    <canvas id="board"></canvas>
+    <button id="pauseBtn" aria-label="Пауза">❚❚</button>
+    <div id="overlay">
+      <h1 id="ovTitle">Тетрис</h1>
+      <p id="ovText">Кнопки внизу: ◀ ▶ — двигать, ⟳ — повернуть, ▼ — ускорить, ⤓ — сбросить.<br>Тап по полю — поворот.</p>
+      <button id="ovBtn">Играть</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="btn" data-act="left" aria-label="Влево">◀</button>
+    <button class="btn" data-act="right" aria-label="Вправо">▶</button>
+    <button class="btn rot" data-act="rotate" aria-label="Повернуть">⟳</button>
+    <button class="btn" data-act="down" aria-label="Вниз">▼</button>
+    <button class="btn" data-act="drop" aria-label="Сбросить">⤓</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const COLS = 10, ROWS = 20;
+  const COLORS = { I:'#4dd4ff', O:'#ffd84d', T:'#b36bff', S:'#5be37d', Z:'#ff5b6b', J:'#5b8cff', L:'#ff9b4d' };
+  const SHAPES = {
+    I: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+    O: [[1,1],[1,1]],
+    T: [[0,1,0],[1,1,1],[0,0,0]],
+    S: [[0,1,1],[1,1,0],[0,0,0]],
+    Z: [[1,1,0],[0,1,1],[0,0,0]],
+    J: [[1,0,0],[1,1,1],[0,0,0]],
+    L: [[0,0,1],[1,1,1],[0,0,0]],
+  };
+
+  const $ = id => document.getElementById(id);
+  const boardCv = $('board'), ctx = boardCv.getContext('2d');
+  const nextCv = $('next'), nctx = nextCv.getContext('2d');
+  const overlay = $('overlay');
+
+  let grid, cur, nextType, bag = [];
+  let score, lines, level, best = 0;
+  let state = 'ready'; // ready | playing | paused | over
+  let dropMs, acc = 0, last = 0, cell = 20, flash = null;
+
+  try { best = +localStorage.getItem('tetris-best') || 0; } catch (e) {}
+
+  // ---------- логика ----------
+  function nextFromBag() {
+    if (!bag.length) {
+      bag = Object.keys(SHAPES);
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+    }
+    return bag.pop();
+  }
+
+  function spawn() {
+    const type = nextType || nextFromBag();
+    nextType = nextFromBag();
+    const m = SHAPES[type].map(r => r.slice());
+    cur = { type, m, x: Math.floor((COLS - m[0].length) / 2), y: 0 };
+    if (collides(cur.m, cur.x, cur.y)) gameOver();
+    drawNext();
+  }
+
+  function collides(m, px, py) {
+    for (let y = 0; y < m.length; y++)
+      for (let x = 0; x < m[y].length; x++) {
+        if (!m[y][x]) continue;
+        const gx = px + x, gy = py + y;
+        if (gx < 0 || gx >= COLS || gy >= ROWS) return true;
+        if (gy >= 0 && grid[gy][gx]) return true;
+      }
+    return false;
+  }
+
+  function rotated(m) {
+    const n = m.length;
+    return m[0].map((_, x) => m.map((_, y) => m[n - 1 - y][x]));
+  }
+
+  function move(dx) {
+    if (state !== 'playing') return;
+    if (!collides(cur.m, cur.x + dx, cur.y)) { cur.x += dx; draw(); }
+  }
+
+  function rotate() {
+    if (state !== 'playing' || cur.type === 'O') return;
+    const m = rotated(cur.m);
+    for (const k of [0, -1, 1, -2, 2]) {
+      if (!collides(m, cur.x + k, cur.y)) { cur.m = m; cur.x += k; draw(); return; }
+    }
+  }
+
+  function softDrop() {
+    if (state !== 'playing') return;
+    if (!collides(cur.m, cur.x, cur.y + 1)) { cur.y++; score += 1; updateHud(); acc = 0; draw(); }
+    else lock();
+  }
+
+  function hardDrop() {
+    if (state !== 'playing') return;
+    let d = 0;
+    while (!collides(cur.m, cur.x, cur.y + 1)) { cur.y++; d++; }
+    score += d * 2;
+    lock();
+  }
+
+  function ghostY() {
+    let y = cur.y;
+    while (!collides(cur.m, cur.x, y + 1)) y++;
+    return y;
+  }
+
+  function lock() {
+    cur.m.forEach((row, y) => row.forEach((v, x) => {
+      if (v && cur.y + y >= 0) grid[cur.y + y][cur.x + x] = cur.type;
+    }));
+    clearLines();
+    if (state === 'playing') spawn();
+    acc = 0;
+    updateHud();
+    draw();
+    if (navigator.vibrate) navigator.vibrate(8);
+  }
+
+  function clearLines() {
+    let n = 0;
+    for (let y = ROWS - 1; y >= 0; y--) {
+      if (grid[y].every(Boolean)) { grid.splice(y, 1); grid.unshift(Array(COLS).fill(0)); n++; y++; }
+    }
+    if (!n) return;
+    score += [0, 100, 300, 500, 800][n] * level;
+    lines += n;
+    level = Math.floor(lines / 10) + 1;
+    dropMs = Math.max(90, 800 - (level - 1) * 70);
+    flash = { until: performance.now() + 120 };
+  }
+
+  function gameOver() {
+    state = 'over';
+    if (score > best) { best = score; try { localStorage.setItem('tetris-best', best); } catch (e) {} }
+    showOverlay('Игра окончена', `Очки: ${score}<br>Рекорд: ${best}`, 'Ещё раз');
+  }
+
+  // ---------- отрисовка ----------
+  function block(c, x, y, size, color, alpha = 1) {
+    c.globalAlpha = alpha;
+    c.fillStyle = color;
+    c.fillRect(x + 1, y + 1, size - 2, size - 2);
+    c.fillStyle = 'rgba(255,255,255,.22)';
+    c.fillRect(x + 1, y + 1, size - 2, Math.max(2, size * 0.14));
+    c.fillStyle = 'rgba(0,0,0,.22)';
+    c.fillRect(x + 1, y + size - 1 - Math.max(2, size * 0.14), size - 2, Math.max(2, size * 0.14));
+    c.globalAlpha = 1;
+  }
+
+  function draw() {
+    const w = boardCv.width, h = boardCv.height, s = w / COLS;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.04)';
+    ctx.lineWidth = 1;
+    for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * s, 0); ctx.lineTo(x * s, h); ctx.stroke(); }
+    for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * s); ctx.lineTo(w, y * s); ctx.stroke(); }
+
+    for (let y = 0; y < ROWS; y++)
+      for (let x = 0; x < COLS; x++)
+        if (grid[y][x]) block(ctx, x * s, y * s, s, COLORS[grid[y][x]]);
+
+    if (cur && state !== 'over') {
+      const gy = ghostY();
+      cur.m.forEach((row, y) => row.forEach((v, x) => {
+        if (v && gy !== cur.y) block(ctx, (cur.x + x) * s, (gy + y) * s, s, COLORS[cur.type], 0.2);
+      }));
+      cur.m.forEach((row, y) => row.forEach((v, x) => {
+        if (v && cur.y + y >= 0) block(ctx, (cur.x + x) * s, (cur.y + y) * s, s, COLORS[cur.type]);
+      }));
+    }
+    if (flash && performance.now() < flash.until) {
+      ctx.fillStyle = 'rgba(255,255,255,.12)';
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  function drawNext() {
+    const w = nextCv.width;
+    nctx.clearRect(0, 0, w, w);
+    if (!nextType) return;
+    const m = SHAPES[nextType], s = 24;
+    const ox = (w - m[0].length * s) / 2, oy = (w - m.length * s) / 2;
+    m.forEach((row, y) => row.forEach((v, x) => { if (v) block(nctx, ox + x * s, oy + y * s, s, COLORS[nextType]); }));
+  }
+
+  function updateHud() {
+    $('score').textContent = score;
+    $('lines').textContent = lines;
+    $('level').textContent = level;
+  }
+
+  function resize() {
+    const wrap = $('boardWrap');
+    const availW = wrap.clientWidth, availH = wrap.clientHeight;
+    cell = Math.max(10, Math.floor(Math.min((availW - 4) / COLS, (availH - 4) / ROWS)));
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    boardCv.style.width = cell * COLS + 4 + 'px';
+    boardCv.style.height = cell * ROWS + 4 + 'px';
+    boardCv.width = cell * COLS * dpr;
+    boardCv.height = cell * ROWS * dpr;
+    if (grid) draw();
+  }
+
+  // ---------- игровой цикл ----------
+  function frame(t) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(t - last, 100);
+    last = t;
+    if (state !== 'playing') return;
+    acc += dt;
+    if (acc >= dropMs) {
+      acc = 0;
+      if (!collides(cur.m, cur.x, cur.y + 1)) cur.y++;
+      else lock();
+      draw();
+    } else if (flash) draw();
+    if (flash && performance.now() >= flash.until) flash = null;
+  }
+
+  function showOverlay(title, html, btn) {
+    $('ovTitle').textContent = title;
+    $('ovText').innerHTML = html;
+    $('ovBtn').textContent = btn;
+    overlay.classList.remove('hidden');
+  }
+
+  function start() {
+    grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    score = 0; lines = 0; level = 1; dropMs = 800; acc = 0; bag = []; nextType = null; flash = null;
+    state = 'playing';
+    overlay.classList.add('hidden');
+    spawn();
+    updateHud();
+    draw();
+  }
+
+  function pause() {
+    if (state === 'playing') {
+      state = 'paused';
+      showOverlay('Пауза', `Рекорд: ${best}`, 'Продолжить');
+    }
+  }
+
+  $('ovBtn').addEventListener('click', () => {
+    if (state === 'paused') { state = 'playing'; overlay.classList.add('hidden'); acc = 0; }
+    else start();
+  });
+  $('pauseBtn').addEventListener('click', pause);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+  // ---------- управление ----------
+  const actions = {
+    left: () => move(-1),
+    right: () => move(1),
+    rotate: rotate,
+    down: softDrop,
+    drop: hardDrop,
+  };
+  const repeating = { left: 160, right: 160, down: 0 };
+
+  document.querySelectorAll('.btn').forEach(btn => {
+    const act = btn.dataset.act;
+    let delayT = null, repT = null;
+    const stop = () => { clearTimeout(delayT); clearInterval(repT); btn.classList.remove('down'); };
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      btn.classList.add('down');
+      actions[act]();
+      if (act in repeating) {
+        delayT = setTimeout(() => { repT = setInterval(actions[act], act === 'down' ? 45 : 60); }, repeating[act] || 120);
+      }
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => btn.addEventListener(ev, stop));
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  });
+
+  // тап по полю = поворот
+  boardCv.addEventListener('pointerdown', e => { e.preventDefault(); rotate(); });
+
+  // клавиатура (для проверки на компьютере)
+  document.addEventListener('keydown', e => {
+    const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'rotate', ArrowDown: 'down', ' ': 'drop' };
+    if (map[e.key]) { e.preventDefault(); actions[map[e.key]](); }
+    else if (e.key === 'p' || e.key === 'P') pause();
+  });
+
+  // запрет масштабирования жестами и двойного тапа в iOS Safari
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev =>
+    document.addEventListener(ev, e => e.preventDefault()));
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+
+  grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  resize();
+  draw();
+  if (best) $('ovText').innerHTML += `<br><br>Рекорд: ${best}`;
+  requestAnimationFrame(t => { last = t; frame(t); });
+})();
+</script>
+</body>
+</html>
