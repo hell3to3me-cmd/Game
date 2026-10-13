@@ -591,9 +591,11 @@
     if (st.hintSeen) $('#hint').classList.add('gone');
     new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { layout(); updateCursorShape(); sizeTable(); }, 200); }).observe(stage);
     requestAnimationFrame(frame);
-    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-      navigator.serviceWorker.register('sw.js').catch(() => { /* офлайн-режим недоступен */ });
-    }
+    try {
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('sw.js').catch(() => { /* офлайн-режим недоступен */ });
+      }
+    } catch (e) { /* закрытая рамка: без офлайн-режима */ }
   }
   let rz = 0;
   G.ui = { st, selectEl, selectTool, setTab, setOpen, toast, S, get paused() { return paused; }, layout, TOOLS };
