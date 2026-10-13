@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Песочница</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Песочница">
+<meta name="theme-color" content="#07080c">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="Физическая песочница: вода, огонь, химия, электричество, периодическая таблица и взрывы.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <main id="stage">
+    <div id="world">
+      <canvas id="cv"></canvas>
+      <canvas id="glow"></canvas>
+    </div>
+    <div id="cursor"></div>
+    <div id="flash"></div>
+
+    <div id="top">
+      <div class="topbar">
+        <button class="fab glass" id="btnPlay" aria-label="Пауза"></button>
+        <button class="fab glass" id="btnUndo" aria-label="Отменить"></button>
+        <button class="fab glass" id="btnStep" aria-label="Шаг" hidden></button>
+      </div>
+      <button class="chip glass" id="chip" aria-label="Выбранное вещество">
+        <span class="sw" id="chipSw"></span><span class="t"><b id="chipName">—</b><i id="chipSub"></i></span>
+      </button>
+      <div class="topbar">
+        <button class="fab glass" id="btnShot" aria-label="Снимок"></button>
+        <button class="fab glass" id="btnSet" aria-label="Настройки"></button>
+      </div>
+    </div>
+
+    <div id="sizeCtl" class="glass">
+      <div class="shape" id="shapeBtn" aria-label="Форма кисти"></div>
+      <div class="vslider" id="vs"><div class="track"><div class="fill" id="vsFill"></div><div class="knob" id="vsKnob"></div></div></div>
+      <div class="val" id="vsVal">4</div>
+    </div>
+
+    <div id="hud"></div>
+    <div id="toast" class="glass"></div>
+    <div id="hint" class="glass">Выбери вещество внизу и рисуй пальцем. Два пальца — две кисти.</div>
+  </main>
+
+  <div id="dockwrap"><section id="dock" class="glass">
+    <button id="grab" aria-label="Развернуть панель"><span></span></button>
+    <nav id="tabs"></nav>
+    <div id="items"></div>
+    <div id="ptable" hidden>
+      <div id="pbar"><span>Периодическая таблица</span><button id="pzoom">Крупнее</button></div>
+      <div id="pcard"></div>
+      <div id="pgrid" class="fit"></div>
+    </div>
+  </section></div>
+</div>
+
+<div id="sheetBg"></div>
+<section id="settings" class="sheet glass" aria-hidden="true">
+  <header><h2>Настройки</h2><button class="x" id="setClose" aria-label="Закрыть"></button></header>
+  <div class="body" id="setBody"></div>
+</section>
+
+<script src="js/data.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/scenes.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
